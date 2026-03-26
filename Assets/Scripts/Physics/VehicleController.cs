@@ -247,7 +247,15 @@ namespace SendIt.Physics
             {
                 Vector3 contactPoint = hit.point;
                 Vector3 contactNormal = hit.normal;
-                string terrainTag = hit.collider.gameObject.tag;
+
+                // Get terrain type from physics material
+                TerrainMaterialManager terrainManager = TerrainMaterialManager.Instance;
+                TerrainMaterialManager.TerrainType terrainType = TerrainType.Road;
+
+                if (terrainManager != null)
+                {
+                    terrainType = terrainManager.GetTerrainTypeFromCollider(hit.collider);
+                }
 
                 // Get slip and load information
                 float slipRatio = wheelContact.GetSlipRatio();
@@ -257,8 +265,8 @@ namespace SendIt.Physics
                 // Get tire temperature
                 float tireTemperature = tires[wheelIndex].GetCurrentTemperature();
 
-                // Call skid mark manager
-                skidMarkManager.OnWheelContact(contactPoint, contactNormal, terrainTag,
+                // Call skid mark manager with terrain type enum
+                skidMarkManager.OnWheelContact(contactPoint, contactNormal, terrainType,
                                               slipRatio, slipAngle, normalForce);
             }
         }

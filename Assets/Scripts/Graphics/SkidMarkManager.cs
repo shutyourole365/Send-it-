@@ -14,6 +14,7 @@ namespace SendIt.Graphics
         private DirtAccumulation dirtAccumulation;
         private VehicleController vehicleController;
         private WheelContact[] wheelContacts;
+        private TerrainMaterialManager terrainMaterialManager;
 
         private void Start()
         {
@@ -52,6 +53,15 @@ namespace SendIt.Graphics
                 return;
             }
 
+            // Get terrain material manager
+            terrainMaterialManager = TerrainMaterialManager.Instance;
+            if (terrainMaterialManager == null)
+            {
+                // Create one if it doesn't exist
+                GameObject managerObject = new GameObject("TerrainMaterialManager");
+                terrainMaterialManager = managerObject.AddComponent<TerrainMaterialManager>();
+            }
+
             // Get wheel contacts
             wheelContacts = GetComponentsInChildren<WheelContact>();
             if (wheelContacts.Length == 0)
@@ -83,7 +93,7 @@ namespace SendIt.Graphics
         /// Process wheel contact and create visual effects.
         /// Called from VehicleController or WheelContact systems.
         /// </summary>
-        public void OnWheelContact(Vector3 contactPoint, Vector3 contactNormal, string terrainTag,
+        public void OnWheelContact(Vector3 contactPoint, Vector3 contactNormal, TerrainMaterialManager.TerrainType terrainType,
                                    float slipRatio, float slipAngle, float wheelLoad)
         {
             if (skidMarkSystem == null || surfaceDeformation == null || dirtAccumulation == null)
@@ -99,11 +109,11 @@ namespace SendIt.Graphics
             }
 
             // Create surface deformation (works on deformable surfaces)
-            surfaceDeformation.CreateSurfaceTrack(contactPoint, contactNormal, terrainTag, slipRatio, wheelLoad);
+            surfaceDeformation.CreateSurfaceTrack(contactPoint, contactNormal, terrainType, slipRatio, wheelLoad);
 
             // Add dirt accumulation
             float speed = vehicleController != null ? vehicleController.GetSpeed() : 0f;
-            dirtAccumulation.AddDirtFromTerrain(contactPoint, terrainTag, speed, wheelLoad);
+            dirtAccumulation.AddDirtFromTerrain(contactPoint, terrainType, speed, wheelLoad);
         }
 
         /// <summary>

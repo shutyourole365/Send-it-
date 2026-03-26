@@ -1,11 +1,13 @@
 using UnityEngine;
 using System.Collections.Generic;
+using SendIt.Physics;
 
 namespace SendIt.Graphics
 {
     /// <summary>
     /// Manages dirt and mud accumulation on the vehicle.
     /// Tracks dirt from different terrain types with varying intensity and persistence.
+    /// Uses TerrainMaterialManager for terrain detection.
     /// </summary>
     public class DirtAccumulation : MonoBehaviour
     {
@@ -14,22 +16,14 @@ namespace SendIt.Graphics
         [SerializeField] private float maxDirtAmount = 1f; // Maximum dirt coverage 0-1
 
         private float currentDirtLevel = 0f; // Total dirt on vehicle
-        private Dictionary<string, float> dirtBySource = new Dictionary<string, float>();
-
-        // Dirt properties per surface type
-        private enum DirtType
-        {
-            Road,      // Light grey dust
-            Grass,     // Green/brown dirt
-            Sand,      // Light tan dirt
-            Mud,       // Dark brown mud
-            Gravel     // Grey dust
-        }
+        private Dictionary<TerrainMaterialManager.TerrainType, float> dirtBySource =
+            new Dictionary<TerrainMaterialManager.TerrainType, float>();
+        private TerrainMaterialManager terrainMaterialManager;
 
         private struct DirtParticle
         {
             public Vector3 Position;
-            public DirtType Type;
+            public TerrainMaterialManager.TerrainType Type;
             public float Amount; // 0-1
             public float CreationTime;
         }
@@ -50,36 +44,48 @@ namespace SendIt.Graphics
             {
                 bodyRenderers = GetComponentsInChildren<Renderer>();
             }
+
+            terrainMaterialManager = TerrainMaterialManager.Instance;
+            if (terrainMaterialManager == null)
+            {
+                // Create one if it doesn't exist
+                GameObject managerObject = new GameObject("TerrainMaterialManager");
+                terrainMaterialManager = managerObject.AddComponent<TerrainMaterialManager>();
+            }
         }
 
         /// <summary>
         /// Add dirt from terrain contact.
         /// </summary>
-        public void AddDirtFromTerrain(Vector3 contactPoint, string terrainTag, float speed, float wheelLoad)
+        public void AddDirtFromTerrain(Vector3 contactPoint, TerrainMaterialManager.TerrainType terrainType, float speed, float wheelLoad)
         {
-            // Determine dirt type
-            DirtType dirtType = GetDirtType(terrainTag);
+            // Get terrain-specific dirt accumulation rate
+            float terrainDirtRate = dirtBuildupRate;
+            if (terrainMaterialManager != null)
+            {
+                terrainDirtRate *= terrainMaterialManager.GetDirtAccumulationRate(terrainType);
+            }
 
             // Calculate dirt accumulation
             // Higher speed = more splashing/accumulation
             // Higher load = more contact = more dirt
             float speedFactor = Mathf.Clamp01(speed / 20f); // Normalized to 20 m/s
             float loadFactor = Mathf.Clamp01(wheelLoad / 5000f); // Normalized to 5000N
-            float dirtAmount = speedFactor * loadFactor * dirtBuildupRate;
+            float dirtAmount = speedFactor * loadFactor * terrainDirtRate;
 
             // Add dirt
             currentDirtLevel = Mathf.Clamp01(currentDirtLevel + dirtAmount);
 
             // Track dirt by source
-            if (!dirtBySource.ContainsKey(terrainTag))
-                dirtBySource[terrainTag] = 0f;
-            dirtBySource[terrainTag] = Mathf.Clamp01(dirtBySource[terrainTag] + dirtAmount);
+            if (!dirtBySource.ContainsKey(terrainType))
+                dirtBySource[terrainType] = 0f;
+            dirtBySource[terrainType] = Mathf.Clamp01(dirtBySource[terrainType] + dirtAmount);
 
             // Create dirt particle for visual effect
             DirtParticle particle = new DirtParticle
             {
                 Position = contactPoint,
-                Type = dirtType,
+                Type = terrainType,
                 Amount = dirtAmount,
                 CreationTime = Time.time
             };
@@ -91,32 +97,23 @@ namespace SendIt.Graphics
         }
 
         /// <summary>
-        /// Get dirt type from terrain tag.
+        /// Get color for dirt type from terrain material manager.
         /// </summary>
-        private DirtType GetDirtType(string terrainTag)
+        private Color GetDirtColor(TerrainMaterialManager.TerrainType terrainType)
         {
-            return terrainTag.ToLower() switch
+            if (terrainMaterialManager != null)
             {
-                "grass" => DirtType.Grass,
-                "sand" => DirtType.Sand,
-                "mud" => DirtType.Mud,
-                "gravel" => DirtType.Gravel,
-                _ => DirtType.Road
-            };
-        }
+                return terrainMaterialManager.GetDirtColor(terrainType);
+            }
 
-        /// <summary>
-        /// Get color for dirt type.
-        /// </summary>
-        private Color GetDirtColor(DirtType dirtType)
-        {
-            return dirtType switch
+            // Fallback colors if no terrain manager
+            return terrainType switch
             {
-                DirtType.Road => new Color(0.6f, 0.6f, 0.6f), // Grey dust
-                DirtType.Grass => new Color(0.4f, 0.35f, 0.2f), // Brown/green
-                DirtType.Sand => new Color(0.75f, 0.7f, 0.5f), // Tan
-                DirtType.Mud => new Color(0.3f, 0.25f, 0.15f), // Dark brown
-                DirtType.Gravel => new Color(0.65f, 0.65f, 0.65f), // Grey
+                TerrainMaterialManager.TerrainType.Road => new Color(0.6f, 0.6f, 0.6f), // Grey dust
+                TerrainMaterialManager.TerrainType.Grass => new Color(0.4f, 0.35f, 0.2f), // Brown/green
+                TerrainMaterialManager.TerrainType.Sand => new Color(0.75f, 0.7f, 0.5f), // Tan
+                TerrainMaterialManager.TerrainType.Mud => new Color(0.3f, 0.25f, 0.15f), // Dark brown
+                TerrainMaterialManager.TerrainType.Gravel => new Color(0.65f, 0.65f, 0.65f), // Grey
                 _ => Color.black
             };
         }
@@ -236,6 +233,11 @@ namespace SendIt.Graphics
             }
             return info;
         }
+
+        /// <summary>
+        /// Get dirt composition by terrain type as dictionary.
+        /// </summary>
+        public Dictionary<TerrainMaterialManager.TerrainType, float> GetDirtComposition() => dirtBySource;
 
         /// <summary>
         /// Update dirt accumulation over time.

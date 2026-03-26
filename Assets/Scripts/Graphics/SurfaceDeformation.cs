@@ -1,11 +1,13 @@
 using UnityEngine;
 using System.Collections.Generic;
+using SendIt.Physics;
 
 namespace SendIt.Graphics
 {
     /// <summary>
     /// Manages surface deformation and tire tracks on various terrains.
     /// Creates visible tire marks and deformation on grass, sand, and mud.
+    /// Uses TerrainMaterialManager for terrain detection.
     /// </summary>
     public class SurfaceDeformation : MonoBehaviour
     {
@@ -15,22 +17,13 @@ namespace SendIt.Graphics
         [SerializeField] private Texture2D tirePatternTexture;
 
         private List<SurfaceTrack> activeTracks = new List<SurfaceTrack>();
-
-        // Surface types with different properties
-        private enum SurfaceType
-        {
-            Road,      // No deformation
-            Grass,     // Light deformation, quick recovery
-            Sand,      // Deep deformation, slow recovery
-            Mud,       // Very deep deformation, very slow recovery
-            Gravel     // Medium deformation, medium recovery
-        }
+        private TerrainMaterialManager terrainMaterialManager;
 
         private struct SurfaceTrack
         {
             public Vector3 Position;
             public Vector3 Normal;
-            public SurfaceType TerrainType;
+            public TerrainMaterialManager.TerrainType TerrainType;
             public float Intensity; // 0-1
             public float CreationTime;
             public float DeformationAmount; // How much ground is displaced
@@ -39,25 +32,32 @@ namespace SendIt.Graphics
         /// <summary>
         /// Create a surface track at the wheel contact point.
         /// </summary>
-        public void CreateSurfaceTrack(Vector3 position, Vector3 normal, string terrainTag, float slipRatio, float wheelLoad)
+        public void CreateSurfaceTrack(Vector3 position, Vector3 normal, TerrainMaterialManager.TerrainType terrainType, float slipRatio, float wheelLoad)
         {
-            // Determine surface type from terrain tag
-            SurfaceType surfaceType = GetSurfaceType(terrainTag);
-
             // Only deformable surfaces create tracks
-            if (surfaceType == SurfaceType.Road)
+            if (terrainType == TerrainMaterialManager.TerrainType.Road || terrainType == TerrainMaterialManager.TerrainType.Ice)
                 return;
+
+            // Get terrain-specific deformation depth
+            if (terrainMaterialManager == null)
+                terrainMaterialManager = TerrainMaterialManager.Instance;
+
+            float terrainTrackDepth = trackDepth;
+            if (terrainMaterialManager != null)
+            {
+                terrainTrackDepth = terrainMaterialManager.GetDeformationDepth(terrainType);
+            }
 
             // Calculate track intensity based on slip and load
             float intensity = Mathf.Clamp01(slipRatio);
             float loadFactor = Mathf.Clamp01(wheelLoad / 5000f); // Normalize to 5000N
-            float deformationAmount = trackDepth * intensity * loadFactor;
+            float deformationAmount = terrainTrackDepth * intensity * loadFactor;
 
             SurfaceTrack track = new SurfaceTrack
             {
                 Position = position,
                 Normal = normal,
-                TerrainType = surfaceType,
+                TerrainType = terrainType,
                 Intensity = intensity,
                 CreationTime = Time.time,
                 DeformationAmount = deformationAmount
@@ -69,20 +69,6 @@ namespace SendIt.Graphics
             ApplyTrackDeformation(track);
         }
 
-        /// <summary>
-        /// Get surface type from terrain tag.
-        /// </summary>
-        private SurfaceType GetSurfaceType(string terrainTag)
-        {
-            return terrainTag.ToLower() switch
-            {
-                "grass" => SurfaceType.Grass,
-                "sand" => SurfaceType.Sand,
-                "mud" => SurfaceType.Mud,
-                "gravel" => SurfaceType.Gravel,
-                _ => SurfaceType.Road
-            };
-        }
 
         /// <summary>
         /// Apply visual deformation to the surface.
@@ -97,16 +83,16 @@ namespace SendIt.Graphics
             // Apply different effects based on surface type
             switch (track.TerrainType)
             {
-                case SurfaceType.Grass:
+                case TerrainMaterialManager.TerrainType.Grass:
                     ApplyGrassTrack(hit, track);
                     break;
-                case SurfaceType.Sand:
+                case TerrainMaterialManager.TerrainType.Sand:
                     ApplySandTrack(hit, track);
                     break;
-                case SurfaceType.Mud:
+                case TerrainMaterialManager.TerrainType.Mud:
                     ApplyMudTrack(hit, track);
                     break;
-                case SurfaceType.Gravel:
+                case TerrainMaterialManager.TerrainType.Gravel:
                     ApplyGravelTrack(hit, track);
                     break;
             }
@@ -197,21 +183,21 @@ namespace SendIt.Graphics
         /// </summary>
         private void Update()
         {
+            if (terrainMaterialManager == null)
+                terrainMaterialManager = TerrainMaterialManager.Instance;
+
             // Remove aged tracks
             for (int i = activeTracks.Count - 1; i >= 0; i--)
             {
                 SurfaceTrack track = activeTracks[i];
                 float age = Time.time - track.CreationTime;
 
-                // Fade time varies by surface type
-                float fadeTime = track.TerrainType switch
+                // Get fade time from terrain material manager
+                float fadeTime = trackFadeTime;
+                if (terrainMaterialManager != null)
                 {
-                    SurfaceType.Grass => trackFadeTime * 0.5f,
-                    SurfaceType.Sand => trackFadeTime,
-                    SurfaceType.Mud => trackFadeTime * 1.5f,
-                    SurfaceType.Gravel => trackFadeTime * 0.8f,
-                    _ => trackFadeTime
-                };
+                    fadeTime = terrainMaterialManager.GetRecoveryTime(track.TerrainType);
+                }
 
                 if (age > fadeTime)
                 {
