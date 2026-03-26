@@ -2,6 +2,7 @@ using UnityEngine;
 using SendIt.Tuning;
 using SendIt.Data;
 using SendIt.Graphics;
+using SendIt.Audio;
 
 namespace SendIt.Physics
 {
@@ -31,6 +32,9 @@ namespace SendIt.Physics
 
         // Graphics systems
         private SkidMarkManager skidMarkManager;
+
+        // Audio systems
+        private AudioController audioController;
 
         // Input
         private float throttleInput;
@@ -113,6 +117,14 @@ namespace SendIt.Physics
                 skidMarkManager = gameObject.AddComponent<SkidMarkManager>();
             }
             skidMarkManager.Initialize();
+
+            // Initialize audio systems
+            audioController = GetComponent<AudioController>();
+            if (audioController == null)
+            {
+                audioController = gameObject.AddComponent<AudioController>();
+            }
+            audioController.Initialize();
 
             // Apply initial configuration
             if (vehicleRigidbody != null)
@@ -383,5 +395,6 @@ namespace SendIt.Physics
         public Telemetry GetTelemetry() => telemetry;
         public VehicleDynamics GetDynamics() => vehicleDynamics;
         public SkidMarkManager GetSkidMarkManager() => skidMarkManager;
+        public AudioController GetAudioController() => audioController;
     }
 }
