@@ -1,6 +1,7 @@
 using UnityEngine;
 using SendIt.Tuning;
 using SendIt.Data;
+using SendIt.Graphics;
 
 namespace SendIt.Physics
 {
@@ -27,6 +28,9 @@ namespace SendIt.Physics
         private Aerodynamics aerodynamics;
         private VehicleDynamics vehicleDynamics;
         private Telemetry telemetry;
+
+        // Graphics systems
+        private SkidMarkManager skidMarkManager;
 
         // Input
         private float throttleInput;
@@ -101,6 +105,14 @@ namespace SendIt.Physics
             {
                 telemetry = new Telemetry();
             }
+
+            // Initialize graphics systems
+            skidMarkManager = GetComponent<SkidMarkManager>();
+            if (skidMarkManager == null)
+            {
+                skidMarkManager = gameObject.AddComponent<SkidMarkManager>();
+            }
+            skidMarkManager.Initialize();
 
             // Apply initial configuration
             if (vehicleRigidbody != null)
@@ -206,7 +218,48 @@ namespace SendIt.Physics
 
                     // Update wheel contact (slip, normal force, friction)
                     wheelContacts[i].Update(wheelColliders[i], vehicleRigidbody, tires[i]);
+
+                    // Update visual effects (skid marks, surface deformation, dirt)
+                    if (skidMarkManager != null)
+                    {
+                        UpdateWheelVisualEffects(i);
+                    }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Update visual effects for wheel contact (skid marks, surface deformation, dirt).
+        /// </summary>
+        private void UpdateWheelVisualEffects(int wheelIndex)
+        {
+            WheelCollider wheelCollider = wheelColliders[wheelIndex];
+            if (wheelCollider == null || !wheelCollider.isGrounded)
+                return;
+
+            WheelContact wheelContact = wheelContacts[wheelIndex];
+            if (wheelContact == null)
+                return;
+
+            // Get contact information
+            RaycastHit hit;
+            if (wheelCollider.GetGroundHit(out hit))
+            {
+                Vector3 contactPoint = hit.point;
+                Vector3 contactNormal = hit.normal;
+                string terrainTag = hit.collider.gameObject.tag;
+
+                // Get slip and load information
+                float slipRatio = wheelContact.GetSlipRatio();
+                float slipAngle = wheelContact.GetSlipAngle();
+                float normalForce = wheelContact.GetNormalForce();
+
+                // Get tire temperature
+                float tireTemperature = tires[wheelIndex].GetCurrentTemperature();
+
+                // Call skid mark manager
+                skidMarkManager.OnWheelContact(contactPoint, contactNormal, terrainTag,
+                                              slipRatio, slipAngle, normalForce);
             }
         }
 
@@ -321,5 +374,6 @@ namespace SendIt.Physics
         public float GetSpeedKmh() => GetSpeed() * 3.6f;
         public Telemetry GetTelemetry() => telemetry;
         public VehicleDynamics GetDynamics() => vehicleDynamics;
+        public SkidMarkManager GetSkidMarkManager() => skidMarkManager;
     }
 }
