@@ -4,8 +4,8 @@ using SendIt.Data;
 namespace SendIt.Physics
 {
     /// <summary>
-    /// Simulates suspension behavior for a single wheel.
-    /// Includes spring stiffness, damping, and ride height.
+    /// Simulates suspension behavior for a single wheel with realistic spring/damper physics.
+    /// Implements Hooke's law and damping forces for accurate suspension response.
     /// </summary>
     public class Suspension
     {
@@ -16,8 +16,14 @@ namespace SendIt.Physics
         private float rideHeight;
         private float antiRollBarStiffness;
 
-        private float currentCompression;
-        private float previousCompression;
+        // Physical state
+        private float currentCompressionDistance; // meters
+        private float compressionVelocity; // meters per second
+        private float previousCompressionDistance;
+
+        // Limits
+        private float maxCompressionDistance = 0.2f; // 20cm max travel
+        private float minCompressionDistance = 0f;
 
         public Suspension(PhysicsData physicsData, int index)
         {
@@ -36,72 +42,113 @@ namespace SendIt.Physics
 
         public void UpdateStiffness(float newStiffness)
         {
-            springStiffness = newStiffness;
+            springStiffness = Mathf.Clamp(newStiffness, 5000f, 50000f);
         }
 
         /// <summary>
-        /// Update suspension force on the wheel collider.
+        /// Calculate spring force using Hooke's Law: F = -kx
         /// </summary>
-        public void Update(WheelCollider wheelCollider, PhysicsData physicsData)
+        private float CalculateSpringForce(float compression)
+        {
+            return -springStiffness * compression;
+        }
+
+        /// <summary>
+        /// Calculate damping force: F_damping = -c * v
+        /// Different coefficients for compression and extension (asymmetric damping)
+        /// </summary>
+        private float CalculateDampingForce(float velocity)
+        {
+            float dampingCoefficient = velocity > 0f ? compressionDamping : extensionDamping;
+            return -dampingCoefficient * 10000f * velocity;
+        }
+
+        /// <summary>
+        /// Update suspension state based on wheel collision.
+        /// </summary>
+        public void Update(WheelCollider wheelCollider, PhysicsData physicsData, float normalForce)
         {
             if (wheelCollider == null)
                 return;
 
-            // Get suspension data from wheel collider
-            WheelHit hit;
-            bool isGrounded = wheelCollider.GetGroundHit(out hit);
+            // Get ground contact info
+            WheelHit wheelHit;
+            bool isGrounded = wheelCollider.GetGroundHit(out wheelHit);
+
+            previousCompressionDistance = currentCompressionDistance;
 
             if (isGrounded)
             {
-                // Calculate compression distance (0 = fully extended, max = fully compressed)
-                float suspensionTravel = wheelCollider.suspensionDistance;
-                currentCompression = 1f - (hit.distance / suspensionTravel);
+                // Wheel is touching ground: compress suspension based on distance
+                float suspensionDistance = wheelCollider.suspensionDistance;
+                float compressionAmount = suspensionDistance - wheelHit.distance;
+
+                // Clamp compression to valid range
+                currentCompressionDistance = Mathf.Clamp(compressionAmount, minCompressionDistance, maxCompressionDistance);
             }
             else
             {
-                // No contact, suspension returns to rest
-                currentCompression = Mathf.Lerp(currentCompression, 0f, Time.deltaTime * 2f);
+                // No ground contact: suspension extends
+                currentCompressionDistance = Mathf.Lerp(currentCompressionDistance, 0f, Time.deltaTime * 3f);
             }
 
-            // Apply spring force (Hooke's Law: F = -kx)
-            float springForce = springStiffness * currentCompression;
+            // Calculate velocity (compression/extension speed)
+            compressionVelocity = (currentCompressionDistance - previousCompressionDistance) / Time.deltaTime;
 
-            // Apply damping (opposing velocity)
-            float compressionVelocity = currentCompression - previousCompression;
-            float dampingCoefficient = compressionVelocity > 0f ? compressionDamping : extensionDamping;
-            float dampingForce = -compressionVelocity * dampingCoefficient * 1000f;
+            // Calculate forces using spring-damper model
+            float springForce = CalculateSpringForce(currentCompressionDistance);
+            float dampingForce = CalculateDampingForce(compressionVelocity);
+            float totalSuspensionForce = springForce + dampingForce;
 
-            // Store for next frame
-            previousCompression = currentCompression;
-
-            // Modify suspension stiffness through wheel collider
-            JettisonSuspensionSettings(wheelCollider);
+            // Apply suspension settings to wheel collider for Unity physics
+            ApplySuspensionSettings(wheelCollider);
         }
 
         /// <summary>
-        /// Apply suspension settings to the wheel collider.
+        /// Apply suspension configuration to wheel collider.
         /// </summary>
-        private void JettisonSuspensionSettings(WheelCollider wheelCollider)
+        private void ApplySuspensionSettings(WheelCollider wheelCollider)
         {
-            WheelCollider.WheelColliderHitEvent hitEvent = new WheelCollider.WheelColliderHitEvent();
-
-            // Update suspension spring
+            // Configure spring settings
             JettisonSpringSettings spring = wheelCollider.suspensionSpring;
-            spring.spring = springStiffness / 1000f; // Normalize for Unity physics
-            spring.damper = (compressionDamping + extensionDamping) / 2f;
+            spring.spring = springStiffness / 10000f; // Normalize for Unity scale
+            spring.damper = (compressionDamping + extensionDamping) / 2000f;
+            spring.targetPosition = 0.5f; // Target middle of suspension travel
             wheelCollider.suspensionSpring = spring;
 
-            // Update suspension distance (affects ride height)
+            // Set suspension distance (affects ride height)
             wheelCollider.suspensionDistance = rideHeight;
         }
 
-        public float GetCurrentCompression() => currentCompression;
+        /// <summary>
+        /// Get the total suspension force (spring + damping).
+        /// </summary>
+        public float GetTotalSuspensionForce()
+        {
+            float springForce = CalculateSpringForce(currentCompressionDistance);
+            float dampingForce = CalculateDampingForce(compressionVelocity);
+            return springForce + dampingForce;
+        }
+
+        /// <summary>
+        /// Get anti-roll bar contribution (weight transfer between left/right wheels).
+        /// </summary>
+        public float GetAntiRollBarForce(float oppositeSideCompression)
+        {
+            float compressionDifference = currentCompressionDistance - oppositeSideCompression;
+            return antiRollBarStiffness * compressionDifference;
+        }
+
+        // Getters for telemetry
+        public float GetCurrentCompression() => currentCompressionDistance;
+        public float GetCompressionVelocity() => compressionVelocity;
         public float GetSpringStiffness() => springStiffness;
         public float GetRideHeight() => rideHeight;
+        public float GetAntiRollBarStiffness() => antiRollBarStiffness;
     }
 
     /// <summary>
-    /// Simple wrapper for suspension spring settings in Unity.
+    /// Spring settings for suspension configuration.
     /// </summary>
     public struct JettisonSpringSettings
     {
