@@ -88,5 +88,9 @@ Assets/
 - [ ] Phase 5: Advanced rendering and effects
 - [ ] Phase 6: Polish and optimization
 
+## Contributing
+
+Before contributing, please familiarize yourself with our [Advanced Git Commands Guide](docs/advanced-git-commands.md), which covers useful commands like `git stash`, `git cherry-pick`, `git revert`, and `git reset` with practical examples.
+
 ## License
 MIT
