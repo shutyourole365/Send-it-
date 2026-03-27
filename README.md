@@ -82,11 +82,47 @@ Assets/
 ## Development Roadmap
 
 - [x] Phase 1: Core physics architecture and tuning system
-- [ ] Phase 2: Advanced physics implementation (slip, temperature, wear)
+- [x] Phase 2: Advanced physics implementation (slip, temperature, wear, pressure, surfaces)
 - [ ] Phase 3: Physics tuning UI with live preview
 - [ ] Phase 4: Graphics customization system
 - [ ] Phase 5: Advanced rendering and effects
 - [ ] Phase 6: Polish and optimization
+
+## Phase 2: Advanced Physics Systems
+
+Phase 2 introduces sophisticated tire physics with 5 integrated subsystems:
+
+### Tire Slip Dynamics
+- Load-dependent peak slip angles and ratios
+- Load transfer effects (lateral and longitudinal)
+- Slip envelope calculation combining lateral and longitudinal grip
+- Realistic grip curves with smooth damping
+
+### Tire Temperature System
+- Localized temperature zones (center, edges, walls)
+- Heat generation from friction and slip
+- Temperature-dependent grip curves
+- Temperature effect on wear acceleration
+
+### Tire Wear Patterns
+- Location-specific wear tracking (center, edges, walls)
+- Tread depth simulation (8mm → 1.6mm minimum)
+- Multiple tire compounds with different wear rates
+- Wear pattern detection and uneven wear penalties
+
+### Tire Pressure System
+- Temperature-pressure relationship (ideal gas law)
+- Pressure effects on grip and wear
+- Under/over-pressure penalties
+- Blowout risk detection
+
+### Surface Conditions System
+- 10 road surface types with unique properties
+- Wetness levels and dynamic grip changes
+- Aquaplaning simulation
+- Temperature effects on grip
+
+See `Assets/Scripts/Physics/PHASE2_DOCUMENTATION.md` for detailed system documentation.
 
 ## License
 MIT
