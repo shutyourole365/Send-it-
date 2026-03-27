@@ -230,5 +230,9 @@ See `Assets/Scripts/UI/PHASE3_4_6_DOCUMENTATION.md` for detailed documentation.
 
 **Total**: 17 new physics/rendering systems, 4 comprehensive UI systems, with 300+ pages of documentation.
 
+## Contributing
+
+Before contributing, please familiarize yourself with our [Advanced Git Commands Guide](docs/advanced-git-commands.md), which covers useful commands like `git stash`, `git cherry-pick`, `git revert`, and `git reset` with practical examples.
+
 ## License
 MIT
