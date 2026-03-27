@@ -31,7 +31,7 @@ namespace SendIt.Physics
         private float loadSensitivity = 0.002f;
 
         // Tire compound (affects wear rate)
-        private enum TireCompound
+        public enum TireCompound
         {
             Street,      // Low wear, medium grip
             Sport,       // Medium wear, high grip
