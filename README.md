@@ -85,7 +85,7 @@ Assets/
 - [x] Phase 2: Advanced physics implementation (slip, temperature, wear, pressure, surfaces)
 - [ ] Phase 3: Physics tuning UI with live preview
 - [ ] Phase 4: Graphics customization system
-- [ ] Phase 5: Advanced rendering and effects
+- [x] Phase 5: Advanced rendering and effects
 - [ ] Phase 6: Polish and optimization
 
 ## Phase 2: Advanced Physics Systems
@@ -123,6 +123,46 @@ Phase 2 introduces sophisticated tire physics with 5 integrated subsystems:
 - Temperature effects on grip
 
 See `Assets/Scripts/Physics/PHASE2_DOCUMENTATION.md` for detailed system documentation.
+
+## Phase 5: Advanced Rendering & Effects
+
+Phase 5 introduces cinematic visual effects with 5 integrated rendering systems:
+
+### Motion Blur Effect
+- Velocity-based motion blur using frame accumulation
+- Adjustable sample count (4-16 samples)
+- Shutter angle control for artistic effects
+- Temporal filtering for smooth transitions
+
+### Depth of Field Effect
+- Auto-focus tracking with smooth transitions
+- Multiple bokeh shapes (Circle, Hexagon, Octagon, Diamond)
+- Circle of Confusion (CoC) calculation
+- f-stop aperture simulation (1.4-32.0)
+
+### Particle Effect System
+- Dynamic tire smoke from slip and temperature
+- Dust generation on loose surfaces
+- Water spray on wet roads
+- Spark generation from impacts
+- Engine overheat smoke
+- Brake glow effects
+
+### Dynamic Lighting System
+- Headlight and brake light management
+- 24-hour time-of-day lighting cycles
+- Engine glow based on temperature
+- Smooth light response curves
+- Ambient color shifts throughout day
+
+### Advanced Shadow System
+- Cascaded shadows (1-4 cascades)
+- Contact shadow detection
+- Dynamic shadow distance optimization
+- Multiple quality levels (Low/Medium/High/Ultra)
+- Reflection probe management
+
+See `Assets/Scripts/Graphics/PHASE5_DOCUMENTATION.md` for detailed system documentation.
 
 ## License
 MIT
