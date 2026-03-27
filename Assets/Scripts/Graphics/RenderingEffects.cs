@@ -1,253 +1,284 @@
 using UnityEngine;
 using SendIt.Data;
+using SendIt.Physics;
 
 namespace SendIt.Graphics
 {
     /// <summary>
-    /// Manages real-time rendering effects including shadows, reflections, ambient occlusion,
-    /// and post-processing effects like motion blur and depth of field.
+    /// Central manager for all rendering effects (Phase 5 enhanced).
+    /// Integrates motion blur, depth of field, particle effects, dynamic lighting, and advanced shadows.
     /// </summary>
     public class RenderingEffects : MonoBehaviour
     {
         [SerializeField] private Camera mainCamera;
-
-        // Effect settings from graphics data
-        private bool enableRealTimeShadows = true;
-        private bool enableReflections = true;
-        private bool enableAmbientOcclusion = true;
-        private float motionBlurIntensity = 0.5f;
-
-        // Shadow settings
         [SerializeField] private Light mainLight;
-        private float shadowDistance = 50f;
-        private int shadowResolution = 2048;
+        [SerializeField] private Rigidbody vehicleRigidbody;
 
-        // Post-processing effects
-        private Material motionBlurMaterial;
-        private Material depthOfFieldMaterial;
+        // Effect systems
+        private MotionBlurEffect motionBlurEffect;
+        private DepthOfFieldEffect depthOfFieldEffect;
+        private ParticleEffectSystem particleEffectSystem;
+        private DynamicLightingSystem dynamicLightingSystem;
+        private AdvancedShadowSystem advancedShadowSystem;
 
-        public void Initialize(GraphicsData graphicsData, Camera camera)
+        // Enable/disable flags
+        private bool enableMotionBlur = true;
+        private bool enableDepthOfField = false;
+        private bool enableParticleEffects = true;
+        private bool enableDynamicLighting = true;
+        private bool enableAdvancedShadows = true;
+
+        // Settings
+        private float motionBlurIntensity = 0.5f;
+        private bool autoFocusEnabled = true;
+        private float particleDensity = 1f;
+
+        private bool isInitialized;
+
+        /// <summary>
+        /// Initialize all rendering effect systems.
+        /// </summary>
+        public void Initialize(GraphicsData graphicsData, Camera camera, Rigidbody vehicleBody = null)
         {
             mainCamera = camera;
+            vehicleRigidbody = vehicleBody;
             if (mainCamera == null)
-            {
                 mainCamera = Camera.main;
-            }
 
-            enableRealTimeShadows = graphicsData.EnableRealTimeShadows;
-            enableReflections = graphicsData.EnableReflections;
-            enableAmbientOcclusion = graphicsData.EnableAmbientOcclusion;
+            if (mainLight == null)
+                mainLight = FindObjectOfType<Light>();
+
             motionBlurIntensity = graphicsData.MotionBlurIntensity;
 
-            SetupEffects();
+            // Initialize all subsystems
+            InitializeMotionBlur();
+            InitializeDepthOfField();
+            InitializeParticleEffects();
+            InitializeDynamicLighting();
+            InitializeAdvancedShadows();
+
+            isInitialized = true;
+            Debug.Log("RenderingEffects Phase 5 initialized successfully");
         }
 
         /// <summary>
-        /// Setup all rendering effects.
+        /// Initialize motion blur effect.
         /// </summary>
-        private void SetupEffects()
+        private void InitializeMotionBlur()
         {
-            SetupShadows();
-            SetupAmbientOcclusion();
-            SetupMotionBlur();
-
-            if (enableReflections)
-            {
-                SetupReflections();
-            }
-        }
-
-        /// <summary>
-        /// Setup shadow rendering system.
-        /// </summary>
-        private void SetupShadows()
-        {
-            if (!enableRealTimeShadows)
-            {
-                QualitySettings.shadowDistance = 0f;
-                return;
-            }
-
-            // Configure shadow settings
-            QualitySettings.shadowDistance = shadowDistance;
-            QualitySettings.shadowResolution = shadowResolution > 0 ?
-                (ShadowResolution)shadowResolution : ShadowResolution.High;
-
-            // Setup main light shadows
-            if (mainLight != null)
-            {
-                mainLight.shadows = LightShadows.Soft;
-                mainLight.shadowStrength = 1f;
-                mainLight.shadowBias = 0.05f;
-                mainLight.shadowNormalBias = 0.4f;
-            }
-        }
-
-        /// <summary>
-        /// Setup ambient occlusion effect.
-        /// </summary>
-        private void SetupAmbientOcclusion()
-        {
-            if (!enableAmbientOcclusion)
+            if (!enableMotionBlur)
                 return;
 
-            // In a full implementation, use a post-processing volume or custom AO pass
-            // For now, we enhance shadows and use ambient lighting
-            RenderSettings.ambientIntensity = 0.8f;
+            motionBlurEffect = gameObject.AddComponent<MotionBlurEffect>();
+            motionBlurEffect.Initialize(mainCamera, vehicleRigidbody, motionBlurIntensity);
         }
 
         /// <summary>
-        /// Setup reflection system.
+        /// Initialize depth of field effect.
         /// </summary>
-        private void SetupReflections()
+        private void InitializeDepthOfField()
         {
-            if (!enableReflections)
+            if (!enableDepthOfField)
                 return;
 
-            // Enable screen-space reflections or create reflection probes
-            // This is typically done through post-processing or environment setup
-            RenderSettings.reflectionIntensity = 0.8f;
+            depthOfFieldEffect = gameObject.AddComponent<DepthOfFieldEffect>();
+            depthOfFieldEffect.Initialize(mainCamera, vehicleRigidbody?.transform, 10f);
+            depthOfFieldEffect.SetAutoFocus(autoFocusEnabled);
         }
 
         /// <summary>
-        /// Setup motion blur post-processing.
+        /// Initialize particle effect system.
         /// </summary>
-        private void SetupMotionBlur()
+        private void InitializeParticleEffects()
         {
-            if (mainCamera != null)
-            {
-                // Motion blur can be implemented as:
-                // 1. Sample-based motion blur (velocity buffer)
-                // 2. Frame blending (simple temporal blur)
-                // 3. Custom post-processing shader
-            }
+            if (!enableParticleEffects)
+                return;
+
+            particleEffectSystem = gameObject.AddComponent<ParticleEffectSystem>();
+            particleEffectSystem.Initialize(vehicleRigidbody);
         }
 
         /// <summary>
-        /// Enable or disable real-time shadows.
+        /// Initialize dynamic lighting system.
         /// </summary>
-        public void SetRealTimeShadows(bool enabled)
+        private void InitializeDynamicLighting()
         {
-            enableRealTimeShadows = enabled;
-            if (!enabled)
-            {
-                QualitySettings.shadowDistance = 0f;
-            }
-            else
-            {
-                QualitySettings.shadowDistance = shadowDistance;
-            }
+            if (!enableDynamicLighting)
+                return;
+
+            dynamicLightingSystem = gameObject.AddComponent<DynamicLightingSystem>();
+            dynamicLightingSystem.Initialize();
         }
 
         /// <summary>
-        /// Enable or disable reflections.
+        /// Initialize advanced shadow system.
         /// </summary>
-        public void SetReflections(bool enabled)
+        private void InitializeAdvancedShadows()
         {
-            enableReflections = enabled;
-            if (enabled)
-            {
-                RenderSettings.reflectionIntensity = 0.8f;
-            }
-            else
-            {
-                RenderSettings.reflectionIntensity = 0f;
-            }
+            if (!enableAdvancedShadows)
+                return;
+
+            advancedShadowSystem = gameObject.AddComponent<AdvancedShadowSystem>();
+            advancedShadowSystem.Initialize(mainLight, mainCamera);
         }
 
         /// <summary>
-        /// Enable or disable ambient occlusion.
+        /// Update all rendering effects each frame.
         /// </summary>
-        public void SetAmbientOcclusion(bool enabled)
+        public void UpdateEffects(float vehicleSpeed, bool braking, float engineTemp, float engineTireTemp)
         {
-            enableAmbientOcclusion = enabled;
+            if (!isInitialized)
+                return;
+
+            if (enableMotionBlur && motionBlurEffect != null)
+                motionBlurEffect.UpdateMotionBlur();
+
+            if (enableDepthOfField && depthOfFieldEffect != null)
+                depthOfFieldEffect.UpdateDepthOfField();
+
+            if (enableDynamicLighting && dynamicLightingSystem != null)
+                dynamicLightingSystem.UpdateLighting(braking, engineTemp, vehicleSpeed);
+
+            if (enableAdvancedShadows && advancedShadowSystem != null)
+                advancedShadowSystem.UpdateDynamicShadows(mainCamera.transform.position, vehicleSpeed);
         }
 
         /// <summary>
-        /// Set motion blur intensity (0-1).
+        /// Update particle effects based on wheel and vehicle state.
         /// </summary>
+        public void UpdateParticleEffects(int wheelIndex, float slipRatio, float slipAngle,
+                                         float tireTemp, float speed, bool onWetSurface)
+        {
+            if (!enableParticleEffects || particleEffectSystem == null)
+                return;
+
+            // Update tire smoke
+            particleEffectSystem.UpdateTireSmoke(wheelIndex, slipRatio, slipAngle, tireTemp);
+
+            // Update dust on loose surfaces
+            bool onLooseSurface = false; // Would come from surface condition check
+            particleEffectSystem.UpdateDustEffect(wheelIndex, speed, onLooseSurface, Vector3.zero);
+
+            // Update water spray
+            particleEffectSystem.UpdateWaterSpray(speed, onWetSurface, Vector3.zero);
+        }
+
+        /// <summary>
+        /// Generate spark effects from impact.
+        /// </summary>
+        public void GenerateImpactSparks(Vector3 impactPoint, Vector3 impactNormal, float impactForce)
+        {
+            if (!enableParticleEffects || particleEffectSystem == null)
+                return;
+
+            particleEffectSystem.GenerateSparks(impactPoint, impactNormal, impactForce);
+        }
+
+        // Effect control methods
+
         public void SetMotionBlurIntensity(float intensity)
         {
             motionBlurIntensity = Mathf.Clamp01(intensity);
+            if (motionBlurEffect != null)
+                motionBlurEffect.SetBlurIntensity(intensity);
         }
 
-        /// <summary>
-        /// Set shadow distance for performance tuning.
-        /// </summary>
-        public void SetShadowDistance(float distance)
+        public void SetDepthOfFieldIntensity(float intensity)
         {
-            shadowDistance = distance;
-            QualitySettings.shadowDistance = shadowDistance;
+            if (depthOfFieldEffect != null)
+                depthOfFieldEffect.SetDOFIntensity(intensity);
         }
 
-        /// <summary>
-        /// Set shadow map resolution.
-        /// </summary>
-        public void SetShadowResolution(int resolution)
+        public void SetAutoFocus(bool enabled)
         {
-            shadowResolution = resolution;
-            QualitySettings.shadowResolution = (ShadowResolution)resolution;
+            autoFocusEnabled = enabled;
+            if (depthOfFieldEffect != null)
+                depthOfFieldEffect.SetAutoFocus(enabled);
         }
 
-        /// <summary>
-        /// Apply velocity-based motion blur (requires velocity buffer).
-        /// </summary>
-        public void ApplyMotionBlur(Rigidbody vehicleBody)
+        public void SetFocusDistance(float distance)
         {
-            if (mainCamera == null || motionBlurIntensity < 0.01f)
-                return;
-
-            // Calculate motion vector based on camera movement
-            Vector3 velocity = vehicleBody.velocity;
-            float motionMagnitude = velocity.magnitude;
-
-            // Motion blur strength increases with speed
-            float blurStrength = motionMagnitude * motionBlurIntensity * 0.01f;
-            blurStrength = Mathf.Clamp(blurStrength, 0f, 0.5f);
-
-            // This would be applied in the post-processing shader
-            // For now, we just calculate the value
+            if (depthOfFieldEffect != null)
+                depthOfFieldEffect.SetFocusDistance(distance);
         }
 
-        /// <summary>
-        /// Apply depth of field effect based on camera focus.
-        /// </summary>
-        public void ApplyDepthOfField(float focusDistance, float apertureSize = 5.6f)
+        public void SetParticleDensity(float density)
         {
-            if (mainCamera == null)
-                return;
-
-            // This would be implemented through a post-processing shader
-            // Parameters: focus distance, aperture size (f-stop), blur radius
-        }
-
-        /// <summary>
-        /// Apply bloom effect for bright surfaces.
-        /// </summary>
-        public void ApplyBloom(float intensity = 1f, float threshold = 1f)
-        {
-            // Bloom effect is typically implemented as:
-            // 1. Extract bright areas above threshold
-            // 2. Blur extracted areas
-            // 3. Add back to original image
-        }
-
-        /// <summary>
-        /// Enable dynamic lighting updates.
-        /// </summary>
-        public void EnableDynamicLighting(bool enabled)
-        {
-            if (mainLight != null)
+            particleDensity = Mathf.Clamp01(density);
+            if (particleEffectSystem != null)
             {
-                mainLight.lightmapBakeType = enabled ?
-                    LightBakingOutput.Mixed : LightBakingOutput.Baked;
+                particleEffectSystem.SetSmokeDensity(density);
+                particleEffectSystem.SetDustDensity(density);
+                particleEffectSystem.SetWaterDensity(density);
             }
         }
 
-        // Getters
-        public bool GetRealTimeShadows() => enableRealTimeShadows;
-        public bool GetReflections() => enableReflections;
-        public bool GetAmbientOcclusion() => enableAmbientOcclusion;
+        public void SetShadowQuality(AdvancedShadowSystem.ShadowQuality quality)
+        {
+            if (advancedShadowSystem != null)
+                advancedShadowSystem.SetQuality(quality);
+        }
+
+        public void SetTimeOfDay(float hour)
+        {
+            if (dynamicLightingSystem != null)
+                dynamicLightingSystem.SetTimeOfDay(hour);
+        }
+
+        public void SetHeadlightIntensity(float intensity)
+        {
+            if (dynamicLightingSystem != null)
+                dynamicLightingSystem.SetHeadlightIntensity(intensity);
+        }
+
+        // Getters for effect systems
+
+        public MotionBlurEffect GetMotionBlurEffect() => motionBlurEffect;
+        public DepthOfFieldEffect GetDepthOfFieldEffect() => depthOfFieldEffect;
+        public ParticleEffectSystem GetParticleEffectSystem() => particleEffectSystem;
+        public DynamicLightingSystem GetDynamicLightingSystem() => dynamicLightingSystem;
+        public AdvancedShadowSystem GetAdvancedShadowSystem() => advancedShadowSystem;
+
+        public bool GetRealTimeShadows() => enableAdvancedShadows;
+        public bool GetReflections() => enableAdvancedShadows;
+        public bool GetAmbientOcclusion() => enableAdvancedShadows;
         public float GetMotionBlurIntensity() => motionBlurIntensity;
+
+        // Enable/disable individual effects
+
+        public void EnableMotionBlur(bool enabled)
+        {
+            enableMotionBlur = enabled;
+            if (motionBlurEffect != null)
+                motionBlurEffect.enabled = enabled;
+        }
+
+        public void EnableDepthOfField(bool enabled)
+        {
+            enableDepthOfField = enabled;
+            if (depthOfFieldEffect != null)
+                depthOfFieldEffect.enabled = enabled;
+        }
+
+        public void EnableParticleEffects(bool enabled)
+        {
+            enableParticleEffects = enabled;
+            if (particleEffectSystem != null)
+                particleEffectSystem.enabled = enabled;
+        }
+
+        public void EnableDynamicLighting(bool enabled)
+        {
+            enableDynamicLighting = enabled;
+            if (dynamicLightingSystem != null)
+                dynamicLightingSystem.enabled = enabled;
+        }
+
+        public void EnableAdvancedShadows(bool enabled)
+        {
+            enableAdvancedShadows = enabled;
+            if (advancedShadowSystem != null)
+                advancedShadowSystem.enabled = enabled;
+        }
     }
 }
