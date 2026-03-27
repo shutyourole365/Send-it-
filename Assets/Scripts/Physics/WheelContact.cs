@@ -5,7 +5,7 @@ namespace SendIt.Physics
 {
     /// <summary>
     /// Manages wheel-ground contact calculations including normal force,
-    /// slip angles, and tire friction forces.
+    /// slip angles, and tire friction forces (Phase 2 enhanced).
     /// </summary>
     public class WheelContact
     {
@@ -27,6 +27,9 @@ namespace SendIt.Physics
         // Configuration
         private float wheelRadius = 0.35f; // meters
         private float wheelMass = 25f; // kg
+        private float vehicleWidth = 1.5f; // meters (for load transfer calculations)
+        private float wheelBase = 2.7f; // meters (for load transfer calculations)
+        private float centerOfGravityHeight = 0.5f; // meters (for load transfer)
 
         public struct ContactData
         {
@@ -102,7 +105,7 @@ namespace SendIt.Physics
         }
 
         /// <summary>
-        /// Calculate slip angle: angle between tire heading and velocity vector.
+        /// Calculate slip angle: angle between tire heading and velocity vector (Phase 2 enhanced).
         /// </summary>
         private void CalculateSlipAngle(WheelCollider wheelCollider, Rigidbody vehicleBody)
         {
@@ -112,20 +115,33 @@ namespace SendIt.Physics
                 return;
             }
 
-            // Get wheel direction
+            // Get wheel direction in world space
             Vector3 wheelDirection = wheelCollider.transform.forward;
 
-            // Project velocity onto ground plane
-            Vector3 velocity = vehicleBody.velocity;
-            Vector3 velocityOnGround = new Vector3(velocity.x, 0f, velocity.z).normalized;
+            // Get velocity at wheel location (considering angular velocity)
+            Vector3 wheelWorldPosition = wheelCollider.transform.position;
+            Vector3 velocity = vehicleBody.velocity + Vector3.Cross(vehicleBody.angularVelocity, wheelWorldPosition - vehicleBody.worldCenterOfMass);
 
-            // Calculate angle between wheel direction and velocity
+            // Project velocity onto ground plane
+            Vector3 velocityOnGround = new Vector3(velocity.x, 0f, velocity.z);
+
+            if (velocityOnGround.magnitude < 0.1f)
+            {
+                slipAngle = 0f;
+                return;
+            }
+
+            velocityOnGround.Normalize();
+
+            // Calculate angle between wheel direction and velocity (signed)
             slipAngle = Vector3.SignedAngle(wheelDirection, velocityOnGround, Vector3.up) * Mathf.Deg2Rad;
-            slipAngle = Mathf.Clamp(slipAngle, -Mathf.PI / 4f, Mathf.PI / 4f); // ±45°
+
+            // Clamp to reasonable range (±90 degrees)
+            slipAngle = Mathf.Clamp(slipAngle, -Mathf.PI / 2f, Mathf.PI / 2f);
         }
 
         /// <summary>
-        /// Calculate slip ratio: difference between wheel speed and ground speed.
+        /// Calculate slip ratio: difference between wheel speed and ground speed (Phase 2 enhanced).
         /// </summary>
         private void CalculateSlipRatio(WheelCollider wheelCollider, Rigidbody vehicleBody)
         {
@@ -135,24 +151,34 @@ namespace SendIt.Physics
                 return;
             }
 
-            // Wheel speed from RPM
+            // Wheel speed from RPM (linear velocity at tire contact point)
             float wheelRPM = wheelCollider.rpm;
             float wheelLinearSpeed = wheelRPM * 2f * Mathf.PI * wheelRadius / 60f;
 
-            // Vehicle speed in direction of wheel
-            float vehicleSpeed = Vector3.Dot(vehicleBody.velocity, wheelCollider.transform.forward);
+            // Vehicle speed in direction of wheel (considering rotation)
+            Vector3 wheelWorldPosition = wheelCollider.transform.position;
+            Vector3 velocityAtWheel = vehicleBody.velocity + Vector3.Cross(vehicleBody.angularVelocity, wheelWorldPosition - vehicleBody.worldCenterOfMass);
+            float vehicleSpeed = Vector3.Dot(velocityAtWheel, wheelCollider.transform.forward);
 
-            // Slip ratio = (wheel speed - vehicle speed) / vehicle speed
+            // Slip ratio calculation
+            // Positive slip ratio = wheel spinning (acceleration)
+            // Negative slip ratio = wheel locking (braking)
             if (Mathf.Abs(vehicleSpeed) > 0.1f)
             {
                 slipRatio = (wheelLinearSpeed - vehicleSpeed) / Mathf.Abs(vehicleSpeed);
+            }
+            else if (wheelLinearSpeed > 0.1f)
+            {
+                // Stationary vehicle with spinning wheel
+                slipRatio = 1f;
             }
             else
             {
                 slipRatio = 0f;
             }
 
-            slipRatio = Mathf.Clamp(slipRatio, -1f, 1f);
+            // Clamp to realistic range (-2 to 2 for extreme cases)
+            slipRatio = Mathf.Clamp(slipRatio, -2f, 2f);
         }
 
         /// <summary>
@@ -185,6 +211,37 @@ namespace SendIt.Physics
             // Distribute aerodynamic downforce to wheels
             float perWheelDownforce = aerodynamicDownforce / 4f;
             return perWheelDownforce;
+        }
+
+        /// <summary>
+        /// Calculate load transfer effects based on vehicle acceleration.
+        /// Returns adjusted normal load considering lateral and longitudinal load transfer.
+        /// </summary>
+        public float GetLoadTransferAdjustedForce(float baseNormalForce, Vector3 vehicleAcceleration)
+        {
+            float adjustedForce = baseNormalForce;
+
+            // Lateral load transfer during cornering
+            if (wheelIndex == 0 || wheelIndex == 2) // Left wheels
+            {
+                adjustedForce += (vehicleAcceleration.x * centerOfGravityHeight / vehicleWidth) * 0.3f;
+            }
+            else // Right wheels
+            {
+                adjustedForce -= (vehicleAcceleration.x * centerOfGravityHeight / vehicleWidth) * 0.3f;
+            }
+
+            // Longitudinal load transfer during acceleration/braking
+            if (wheelIndex < 2) // Front wheels
+            {
+                adjustedForce -= (vehicleAcceleration.z * centerOfGravityHeight / wheelBase) * 0.4f;
+            }
+            else // Rear wheels
+            {
+                adjustedForce += (vehicleAcceleration.z * centerOfGravityHeight / wheelBase) * 0.4f;
+            }
+
+            return Mathf.Max(adjustedForce, 100f); // Minimum load
         }
 
         // Getters for telemetry

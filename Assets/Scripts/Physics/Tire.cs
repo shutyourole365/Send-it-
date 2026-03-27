@@ -4,8 +4,8 @@ using SendIt.Data;
 namespace SendIt.Physics
 {
     /// <summary>
-    /// Advanced tire simulation using a simplified Pacejka tire model.
-    /// Simulates grip curves, slip angles, temperature effects, and wear.
+    /// Advanced tire simulation using Pacejka tire model with Phase 2 enhancements.
+    /// Integrates slip dynamics, temperature zones, wear patterns, pressure effects, and surface conditions.
     /// </summary>
     public class Tire
     {
@@ -15,9 +15,16 @@ namespace SendIt.Physics
         private float temperatureSensitivity;
         private float wearRate;
 
+        // Phase 2 systems
+        private TireSlipDynamics slipDynamics;
+        private TireTemperatureSystem temperatureSystem;
+        private TireWearPatterns wearPatterns;
+        private TirePressureSystem pressureSystem;
+        private SurfaceConditionsSystem surfaceConditions;
+
         // Physical state
-        private float currentTemperature = 20f; // Celsius
-        private float wearAmount = 0f; // 0-1
+        private float currentTemperature = 20f; // Celsius (kept for compatibility)
+        private float wearAmount = 0f; // 0-1 (kept for compatibility)
         private float slipAngle = 0f; // Radians
         private float slipRatio = 0f; // 0-1
 
@@ -36,6 +43,13 @@ namespace SendIt.Physics
         {
             wheelIndex = index;
             UpdateParameters(physicsData);
+
+            // Initialize Phase 2 systems
+            slipDynamics = new TireSlipDynamics();
+            temperatureSystem = new TireTemperatureSystem();
+            wearPatterns = new TireWearPatterns(TireWearPatterns.TireCompound.Street);
+            pressureSystem = new TirePressureSystem(32f);
+            surfaceConditions = new SurfaceConditionsSystem();
         }
 
         public void UpdateParameters(PhysicsData physicsData)
@@ -66,38 +80,73 @@ namespace SendIt.Physics
         private float pacejkaD => gripCoefficient * 1000f; // D = peak friction coefficient
 
         /// <summary>
-        /// Calculate grip force based on slip angle, load, and tire conditions.
+        /// Calculate grip force based on slip angle, load, and tire conditions (Phase 2 enhanced).
+        /// Integrates all Phase 2 systems: slip dynamics, temperature, wear, pressure, and surface.
         /// </summary>
         public float CalculateGripForce(float slipAngleDegrees, float normalLoad, float velocity)
         {
+            // Convert to radians for new systems
+            float slipAngleRad = slipAngleDegrees * Mathf.Deg2Rad;
+
             // Update tire conditions
             UpdateTemperature(velocity);
+            slipAngle = slipAngleRad;
 
-            // Apply Pacejka curve
-            float baseGripForce = PacejkaLateralForce(slipAngleDegrees, normalLoad);
+            // Update Phase 2 systems
+            float averageTemp = temperatureSystem.GetAverageTemperature();
+            pressureSystem.Update(averageTemp);
 
-            // Apply temperature factor (grip improves with warmth, degraded when cold or overheated)
-            float tempFactor = GetTemperatureFactor();
+            // Update slip dynamics with load and vehicle state
+            slipDynamics.Update(slipAngleRad, slipRatio, normalLoad, 0f, 0f);
 
-            // Apply wear factor (gradual grip loss)
-            float wearFactor = 1f - (wearAmount * 0.35f); // Up to 35% grip loss from full wear
+            // Adjust normal load for load transfer
+            float adjustedLoad = slipDynamics.GetAdjustedNormalLoad(normalLoad, wheelIndex);
 
-            return baseGripForce * tempFactor * wearFactor;
+            // Apply Pacejka curve with adjusted load
+            float baseGripForce = PacejkaLateralForce(slipAngleDegrees, adjustedLoad);
+
+            // Apply temperature factor from new system
+            float tempFactor = temperatureSystem.GetTemperatureGripFactor();
+
+            // Apply wear factor from new system
+            float wearFactor = wearPatterns.GetWearGripFactor();
+
+            // Apply pressure factor
+            float pressureFactor = pressureSystem.GetPressureGripFactor();
+
+            // Apply surface conditions
+            float surfaceGrip = surfaceConditions.GetGripCoefficient();
+
+            // Apply slip dynamics grip factor (accounts for slip envelope)
+            float slipGripFactor = slipDynamics.GetGripFactor();
+
+            // Combined grip: multiply all factors
+            return baseGripForce * tempFactor * wearFactor * pressureFactor * surfaceGrip * slipGripFactor;
         }
 
         /// <summary>
-        /// Simplified longitudinal force (acceleration/braking) model.
+        /// Longitudinal force (acceleration/braking) model with Phase 2 enhancements.
         /// </summary>
-        public float CalculateLongitudinalForce(float slipRatio, float normalLoad, float velocity)
+        public float CalculateLongitudinalForce(float inputSlipRatio, float normalLoad, float velocity)
         {
             UpdateTemperature(velocity);
 
             // Slip ratio: 0 = no slip, 1 = full slip (wheel lock or spin)
-            slipRatio = Mathf.Clamp01(slipRatio);
+            this.slipRatio = Mathf.Clamp(inputSlipRatio, -1f, 1f);
 
-            // Peak grip at ~15% slip ratio
-            float optimalSlipRatio = 0.15f;
-            float normalizedSlip = slipRatio / optimalSlipRatio;
+            // Update Phase 2 systems
+            float averageTemp = temperatureSystem.GetAverageTemperature();
+            pressureSystem.Update(averageTemp);
+
+            // Update slip dynamics
+            slipDynamics.Update(slipAngle, this.slipRatio, normalLoad, 0f, 0f);
+
+            // Adjust normal load for load transfer
+            float adjustedLoad = slipDynamics.GetAdjustedNormalLoad(normalLoad, wheelIndex);
+
+            // Peak grip at load-dependent slip ratio
+            float optimalSlipRatio = slipDynamics.GetPeakSlipRatio();
+            float normalizedSlip = this.slipRatio / optimalSlipRatio;
 
             float gripFraction;
             if (normalizedSlip < 1f)
@@ -111,43 +160,36 @@ namespace SendIt.Physics
                 gripFraction = 1f - (normalizedSlip - 1f) * 0.4f;
             }
 
-            float tempFactor = GetTemperatureFactor();
-            float wearFactor = 1f - (wearAmount * 0.35f);
+            // Apply all Phase 2 factors
+            float tempFactor = temperatureSystem.GetTemperatureGripFactor();
+            float wearFactor = wearPatterns.GetWearGripFactor();
+            float pressureFactor = pressureSystem.GetPressureGripFactor();
+            float surfaceGrip = surfaceConditions.GetGripCoefficient();
+            float slipGripFactor = slipDynamics.GetGripFactor();
 
-            return gripCoefficient * normalLoad * gripFraction * tempFactor * wearFactor;
+            return gripCoefficient * adjustedLoad * gripFraction * tempFactor * wearFactor * pressureFactor * surfaceGrip * slipGripFactor;
         }
 
         /// <summary>
-        /// Update tire temperature based on vehicle speed and friction.
+        /// Update tire temperature based on vehicle speed, friction, and slip (Phase 2 enhanced).
         /// </summary>
         private void UpdateTemperature(float velocity)
         {
-            // Heat generation proportional to speed and grip
-            float heatGeneration = Mathf.Abs(velocity) * gripCoefficient * 0.5f;
-            float targetTemperature = MinTireTemperature + heatGeneration;
+            // Use new temperature system
+            float normalLoad = 3000f; // Default normal load
+            float lateralAccel = 0f; // Would come from vehicle dynamics in full integration
 
-            // Clamp target temperature
-            targetTemperature = Mathf.Clamp(targetTemperature, MinTireTemperature, MaxTireTemperature);
+            temperatureSystem.Update(slipAngle, slipRatio, normalLoad, velocity, lateralAccel);
 
-            // Exponential approach to target temperature
-            float heatingRate = 2f * Time.deltaTime; // Tires heat up quickly
-            currentTemperature = Mathf.Lerp(currentTemperature, targetTemperature, heatingRate);
+            // Update compatibility field
+            currentTemperature = temperatureSystem.GetAverageTemperature();
 
-            // Cooling when parked
-            if (velocity < 1f)
-            {
-                float coolingRate = 0.5f * Time.deltaTime;
-                currentTemperature = Mathf.Lerp(currentTemperature, MinTireTemperature, coolingRate);
-            }
+            // Update wear patterns based on temperature
+            float tempWearFactor = temperatureSystem.GetTemperatureWearFactor();
+            wearPatterns.Update(tempWearFactor, slipAngle, slipRatio, normalLoad, velocity, lateralAccel);
 
-            // Tire degradation accelerates at high temperatures
-            if (currentTemperature > OptimalTireTemperature)
-            {
-                float excessTemp = currentTemperature - OptimalTireTemperature;
-                float degradationFactor = 1f + (excessTemp / (MaxTireTemperature - OptimalTireTemperature));
-                wearAmount += wearRate * degradationFactor * Time.deltaTime;
-                wearAmount = Mathf.Clamp01(wearAmount);
-            }
+            // Update compatibility field
+            wearAmount = wearPatterns.GetTotalWear();
         }
 
         /// <summary>
@@ -190,7 +232,44 @@ namespace SendIt.Physics
         public float GetSlipAngle() => slipAngle;
         public float GetSlipRatio() => slipRatio;
 
-        public void ResetWear() => wearAmount = 0f;
-        public void SetWear(float amount) => wearAmount = Mathf.Clamp01(amount);
+        public void ResetWear()
+        {
+            wearAmount = 0f;
+            wearPatterns?.ResetWear();
+        }
+
+        public void SetWear(float amount)
+        {
+            wearAmount = Mathf.Clamp01(amount);
+            wearPatterns?.SetWear(amount);
+        }
+
+        /// <summary>
+        /// Set surface conditions (for multi-surface track simulation).
+        /// </summary>
+        public void SetSurfaceType(SurfaceConditionsSystem.SurfaceType surfaceType)
+        {
+            surfaceConditions?.SetSurfaceType(surfaceType);
+        }
+
+        public void SetSurfaceWetness(float wetness)
+        {
+            surfaceConditions?.SetWetness(wetness);
+        }
+
+        /// <summary>
+        /// Adjust tire pressure (pit stop adjustments).
+        /// </summary>
+        public void SetTirePressure(float pressurePSI)
+        {
+            pressureSystem?.SetPressure(pressurePSI);
+        }
+
+        // Phase 2 system getters for telemetry and diagnostics
+        public TireSlipDynamics GetSlipDynamics() => slipDynamics;
+        public TireTemperatureSystem GetTemperatureSystem() => temperatureSystem;
+        public TireWearPatterns GetWearPatterns() => wearPatterns;
+        public TirePressureSystem GetPressureSystem() => pressureSystem;
+        public SurfaceConditionsSystem GetSurfaceConditions() => surfaceConditions;
     }
 }
