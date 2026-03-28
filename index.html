@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SendIt - Racing Career</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-top: 20px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+            background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            flex-shrink: 0;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            color: #fff;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+            color: #000;
+            border-color: #ff6b6b;
+        }
+
+        .tab-btn:hover {
+            border-color: #ff6b6b;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .level-card {
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 217, 61, 0.2));
+            border: 2px solid rgba(255, 107, 107, 0.5);
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .level-badge {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .level-text {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ffd93d);
+            width: 62.5%;
+            transition: width 0.3s;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .race-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 107, 107, 0.1);
+            border-left: 4px solid #ff6b6b;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+
+        .race-info {
+            flex: 1;
+        }
+
+        .race-track {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .race-time {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+
+        .race-position {
+            font-size: 1.5em;
+            font-weight: bold;
+            padding: 5px 10px;
+            background: rgba(255, 217, 61, 0.2);
+            border-radius: 5px;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .upgrade-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(107, 255, 107, 0.1);
+            border-left: 4px solid #6bff6b;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+
+        .upgrade-info {
+            flex: 1;
+        }
+
+        .upgrade-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .upgrade-price {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+
+        .buy-btn {
+            padding: 8px 15px;
+            background: linear-gradient(135deg, #6bff6b, #00ff00);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .buy-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .buy-btn:disabled {
+            background: #555;
+            color: #aaa;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-box-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 5px;
+            background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-box-label {
+            font-size: 0.8em;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-bottom: 20px;
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #aaa;
+        }
+
+        .medal {
+            display: inline-block;
+            font-size: 2em;
+            margin-right: 10px;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2em;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            .level-badge {
+                font-size: 2.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏎️ SendIt</h1>
+            <p class="subtitle">Racing Career Manager</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('career')">Career</button>
+            <button class="tab-btn" onclick="switchTab('races')">Races</button>
+            <button class="tab-btn" onclick="switchTab('upgrades')">Shop</button>
+            <button class="tab-btn" onclick="switchTab('stats')">Stats</button>
+        </div>
+
+        <!-- CAREER TAB -->
+        <div id="career" class="tab-content active">
+            <div class="card level-card">
+                <div class="level-badge">🌟</div>
+                <div class="level-text">Level 5</div>
+                <div style="color: #aaa; margin-bottom: 10px;">Elite Driver</div>
+                <div style="font-size: 0.9em; color: #aaa;">1,250 / 2,000 XP</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 62.5%;"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 15px;">💰 Career Balance</h3>
+                <div style="font-size: 2.5em; font-weight: bold; color: #6bff6b; margin-bottom: 10px;">$125,450</div>
+                <div style="color: #aaa; font-size: 0.9em;">+$5,250 from last race</div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 15px;">📈 Career Stats</h3>
+                <div class="stat-row">
+                    <div class="stat-label">Total Races</div>
+                    <div class="stat-value">47</div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-label">Wins</div>
+                    <div class="stat-value">23</div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-label">Win Rate</div>
+                    <div class="stat-value">48.9%</div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-label">Best Lap</div>
+                    <div class="stat-value">1:23.45</div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-label">Total Distance</div>
+                    <div class="stat-value">2,340 km</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 15px;">🎁 Achievements</h3>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <span style="background: rgba(255, 217, 61, 0.2); padding: 8px 12px; border-radius: 20px; font-size: 0.9em;">🏆 Win 10 Races</span>
+                    <span style="background: rgba(255, 217, 61, 0.2); padding: 8px 12px; border-radius: 20px; font-size: 0.9em;">⚡ Reach Level 5</span>
+                    <span style="background: rgba(255, 107, 107, 0.2); padding: 8px 12px; border-radius: 20px; font-size: 0.9em;">🔥 Break 1:30</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RACES TAB -->
+        <div id="races" class="tab-content">
+            <h2 style="margin-bottom: 15px;">Recent Races</h2>
+
+            <div class="race-item">
+                <div class="race-info">
+                    <div class="race-track">Mountain Circuit</div>
+                    <div class="race-time">Just now • 2:45.32</div>
+                </div>
+                <div class="race-position" style="background: rgba(255, 217, 61, 0.3); color: #ffd93d;">🥇 1ST</div>
+            </div>
+
+            <div class="race-item">
+                <div class="race-info">
+                    <div class="race-track">Desert Dunes</div>
+                    <div class="race-time">1 hour ago • 3:12.18</div>
+                </div>
+                <div class="race-position" style="background: rgba(192, 192, 192, 0.3); color: #c0c0c0;">🥈 2ND</div>
+            </div>
+
+            <div class="race-item">
+                <div class="race-info">
+                    <div class="race-track">City Streets</div>
+                    <div class="race-time">3 hours ago • 1:58.45</div>
+                </div>
+                <div class="race-position" style="background: rgba(255, 217, 61, 0.3); color: #ffd93d;">🥇 1ST</div>
+            </div>
+
+            <div class="race-item">
+                <div class="race-info">
+                    <div class="race-track">Forest Road</div>
+                    <div class="race-time">5 hours ago • 2:34.92</div>
+                </div>
+                <div class="race-position" style="background: rgba(205, 127, 50, 0.3); color: #cd7f32;">🥉 3RD</div>
+            </div>
+
+            <div class="race-item">
+                <div class="race-info">
+                    <div class="race-track">Beach Road</div>
+                    <div class="race-time">Yesterday • 2:15.33</div>
+                </div>
+                <div class="race-position" style="background: rgba(255, 217, 61, 0.3); color: #ffd93d;">🥇 1ST</div>
+            </div>
+        </div>
+
+        <!-- UPGRADES TAB -->
+        <div id="upgrades" class="tab-content">
+            <h2 style="margin-bottom: 15px;">🛒 Upgrade Shop</h2>
+
+            <div class="upgrade-item">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">⚡ Turbocharger</div>
+                    <div class="upgrade-price">+15% acceleration • $25,000</div>
+                </div>
+                <button class="buy-btn" onclick="alert('Purchased Turbocharger!')">Buy</button>
+            </div>
+
+            <div class="upgrade-item">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">🛞 Racing Suspension</div>
+                    <div class="upgrade-price">+20% grip • $15,000</div>
+                </div>
+                <button class="buy-btn" onclick="alert('Purchased Racing Suspension!')">Buy</button>
+            </div>
+
+            <div class="upgrade-item">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">🛑 Brake Upgrade</div>
+                    <div class="upgrade-price">-30% braking distance • $12,000</div>
+                </div>
+                <button class="buy-btn" onclick="alert('Purchased Brake Upgrade!')">Buy</button>
+            </div>
+
+            <div class="upgrade-item">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">🔧 Engine Tune</div>
+                    <div class="upgrade-price">+8% max speed • $8,000</div>
+                </div>
+                <button class="buy-btn" onclick="alert('Purchased Engine Tune!')">Buy</button>
+            </div>
+
+            <div class="upgrade-item">
+                <div class="upgrade-info">
+                    <div class="upgrade-name">✨ Custom Paint</div>
+                    <div class="upgrade-price">Red metallic color • $3,000</div>
+                </div>
+                <button class="buy-btn" onclick="alert('Purchased Custom Paint!')">Buy</button>
+            </div>
+        </div>
+
+        <!-- STATS TAB -->
+        <div id="stats" class="tab-content">
+            <h2 style="margin-bottom: 15px;">📊 Performance Stats</h2>
+
+            <div class="card">
+                <h3 style="margin-bottom: 15px;">Track Rankings</h3>
+                <div class="stat-row">
+                    <div class="stat-label">Mountain Circuit</div>
+                    <div class="stat-value">1:23.45</div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-label">Desert Dunes</div>
+                    <div class="stat-value">1:54.32</div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-label">City Streets</div>
+                    <div class="stat-value">1:37.18</div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-label">Forest Road</div>
+                    <div class="stat-value">2:02.45</div>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-label">Beach Road</div>
+                    <div class="stat-value">1:58.22</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 15px;">Recent Performance</h3>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-box-value">198</div>
+                        <div class="stat-box-label">Top Speed</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-value">4.2G</div>
+                        <div class="stat-box-label">Peak G-Force</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-value">87°C</div>
+                        <div class="stat-box-label">Tire Temp</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-value">8%</div>
+                        <div class="stat-box-label">Damage</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>🏁 SendIt Racing Career Manager v1.0</p>
+        <p style="margin-top: 10px; color: #555;">Connected to game server</p>
+    </footer>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Remove active from all buttons
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+
+            // Activate button
+            event.target.classList.add('active');
+        }
+
+        // Mobile-friendly touch handling
+        document.addEventListener('touchmove', function(e) {
+            const tabs = document.querySelector('.tabs');
+            if (tabs.contains(e.target)) {
+                return; // Allow tab scrolling
+            }
+        }, false);
+    </script>
+</body>
+</html>
